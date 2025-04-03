@@ -13,8 +13,10 @@ const EInvalidPublisher: u64 = 1;
 const EUnknownAttestationType: u64 = 2;
 /// Attestation type registered as non-revocable
 const ENotRevocableType: u64 = 3;
-/// Attestation with this ID was already revoked
+/// Attestation was already revoked
 const EAttestationAlreadyRevoked: u64 = 4;
+/// Only authors can revoke their attestations
+const EAttestationAuthorMismatch: u64 = 4;
 
 /// Shared registry object
 public struct Registry has key {
@@ -73,11 +75,11 @@ fun init(otw: ATTESTATION, ctx: &mut TxContext) {
 
 /// Register attestation type and its Display
 public fun register_type<T: key + store>(
-    registry: &mut Registry,
     publisher: &Publisher,
     is_revocable: bool,
     fields: vector<std::string::String>,
     values: vector<std::string::String>,
+    registry: &mut Registry,
     ctx: &mut TxContext,
 ) {
     // Ensure `T` type belongs to the provided `publisher`
@@ -85,7 +87,7 @@ public fun register_type<T: key + store>(
 
     // Add type to the registry if it wasn't already
     let type_name = get_type_name<T>().into_string();
-    assert!(table::contains(&registry.is_revocable_type, type_name), EUnknownAttestationType);
+    assert!(!table::contains(&registry.is_revocable_type, type_name), EUnknownAttestationType);
     table::add(&mut registry.is_revocable_type, type_name, is_revocable);
 
     // Create and freeze newly registered type
@@ -103,9 +105,9 @@ public fun register_type<T: key + store>(
 
 /// Create attestation
 public fun attest<T: key + store>(
-    registry: &Registry,
     to: address,
     data: T,
+    registry: &Registry,
     ctx: &mut TxContext,
 ) {
     // Abort if the type was not previosly created via `register_type`
@@ -130,10 +132,13 @@ public fun attest<T: key + store>(
 
 /// Revoke attestation
 public fun revoke<T: key + store>(
+    attestation: &Attestation<T>,
     registry: &mut Registry,
-    attestation: &mut Attestation<T>,
     ctx: &mut TxContext,
 ) {
+    // Abort if author mismatch
+    assert!(attestation.author == ctx.sender(), EAttestationAuthorMismatch);
+
     // Abort if the type was not previosly created via `register_type`
     let type_name = get_type_name<T>().into_string();
     assert!(table::contains(&registry.is_revocable_type, type_name), EUnknownAttestationType);
@@ -143,10 +148,8 @@ public fun revoke<T: key + store>(
     assert!(is_revocable_type == true, ENotRevocableType);
 
     // Abort if already revoked
-    let is_revoked = table::borrow(&registry.is_revoked, object::id(attestation));
-    assert!(is_revoked == true, EAttestationAlreadyRevoked);
-
-    // Set is_revoked flag
+    let has_revoke_key = table::contains(&registry.is_revoked, object::id(attestation));
+    assert!(has_revoke_key != true, EAttestationAlreadyRevoked);
     table::add(&mut registry.is_revoked, object::id(attestation), true);
 
     // Emit
@@ -156,4 +159,10 @@ public fun revoke<T: key + store>(
         author: attestation.author,
         revoked_by: ctx.sender(),
     });
+}
+
+#[test_only]
+/// Wrapper of module initializer for testing
+public fun test_init(ctx: &mut TxContext) {
+    init(ATTESTATION {}, ctx)
 }

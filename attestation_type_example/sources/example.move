@@ -36,7 +36,14 @@ public fun register_itself(
         b"Test usage of the Attesation package".to_string(),
         b"https://example.com/attestation/{id}".to_string(),
     ];
-    attestation::register_type<ExampleAttestion>(registry, publisher, is_revocable, fields, values, ctx)
+    attestation::register_type<ExampleAttestion>(
+        publisher,
+        is_revocable,
+        fields,
+        values,
+        registry,
+        ctx,
+    )
 }
 
 /// Create attestation
@@ -51,9 +58,9 @@ public fun attest(
         what,
     };
     attestation::attest<ExampleAttestion>(
-        registry,
         to,
         attestation_object,
+        registry,
         ctx,
     )
 }
