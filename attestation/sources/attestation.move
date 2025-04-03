@@ -5,7 +5,6 @@ use sui::package::{Self, Publisher};
 use std::ascii::{String};
 use sui::table::{Self, Table};
 use std::type_name::{get as get_type_name};
-use sui::event::{Self};
 
 /// Not a valid owner of the publisher object
 const EInvalidPublisher: u64 = 1;
@@ -43,20 +42,6 @@ public struct Attestation<T: store> has key {
 // Meta revocation type
 public struct Revocation has key {
     id: UID,
-    receiver: address,
-    revoked_by: address,
-}
-
-/// Event emitted when an Attestation is created
-public struct AttestationCreated has copy, drop {
-    attestation_id: ID,
-    receiver: address,
-    created_by: address,
-}
-
-/// Event emitted when an Attestation is revoked
-public struct AttestationRevoked has copy, drop {
-    attestation_id: ID,
     receiver: address,
     revoked_by: address,
 }
@@ -126,11 +111,6 @@ public fun attest<T: key + store>(
         receiver,
         data,
     };
-    event::emit(AttestationCreated {
-        attestation_id: object::id(&attestation),
-        receiver,
-        created_by,
-    });
     transfer::transfer(attestation, receiver);
 }
 
@@ -156,11 +136,6 @@ public fun revoke<T: key + store>(
         receiver: attestation.receiver,
         revoked_by: ctx.sender(),
     };
-    event::emit(AttestationRevoked {
-        attestation_id: object::id(attestation),
-        receiver: attestation.receiver,
-        revoked_by: ctx.sender(),
-    });
     transfer::transfer(revocation, attestation.receiver);
 }
 
