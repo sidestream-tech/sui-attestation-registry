@@ -2,9 +2,9 @@
 module attestation::attestation_tests;
 
 /// Imports
-use sui::package::{Self, Publisher};
-use attestation::attestation::{Self, Registry, Attestation};
 use sui::test_scenario;
+use sui::package::{Self, Publisher};
+use attestation::attestation::{Self, Registry, Attestation, AttestationType};
 
 /// Test attestation type
 public struct TestAttestion has key, store {
@@ -66,37 +66,37 @@ fun test_happy_path() {
     // Create new attestation
     {
         // Borrow required objects
-        let package_registry = test_scenario::take_shared<Registry>(&scenario);
+        let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
         
         attestation::attest<TestAttestion>(
-            attestation_receiver,
             TestAttestion {
                 id: object::new(test_scenario::ctx(&mut scenario)),
                 is_good: true
             },
-            &package_registry,
+            attestation_receiver,
+            &attestation_type,
             test_scenario::ctx(&mut scenario),
         );
 
         // Return borrowed
-        test_scenario::return_shared(package_registry);
+        test_scenario::return_immutable(attestation_type);
     };
 
     scenario.next_tx(attestation_creator);
     // Revoke previously created attestation
     {
         // Borrow required objects
-        let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
+        let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
         let attestation = test_scenario::take_from_address<Attestation<TestAttestion>>(&scenario, attestation_receiver);
 
         attestation::revoke<TestAttestion>(
             &attestation,
-            &mut package_registry,
+            &attestation_type,
             test_scenario::ctx(&mut scenario),
         );
 
         // Return borrowed
-        test_scenario::return_shared(package_registry);
+        test_scenario::return_immutable(attestation_type);
         test_scenario::return_to_address<Attestation<TestAttestion>>(attestation_receiver, attestation);
     };
 

@@ -9,50 +9,55 @@ use sui::event::{Self};
 
 /// Not a valid owner of the publisher object
 const EInvalidPublisher: u64 = 1;
+/// Attestation type of type T was already registered
+const EAlreadyRegistered: u64 = 2;
 /// Attestation type of type T was not registered
-const EUnknownAttestationType: u64 = 2;
+const EUnknownAttestationType: u64 = 3;
 /// Attestation type registered as non-revocable
-const ENotRevocableType: u64 = 3;
-/// Attestation was already revoked
-const EAttestationAlreadyRevoked: u64 = 4;
+const ENotRevocableType: u64 = 4;
 /// Only authors can revoke their attestations
-const EAttestationAuthorMismatch: u64 = 4;
+const EAttestationAuthorMismatch: u64 = 5;
 
 /// Shared registry object
 public struct Registry has key {
     id: UID,
     publisher: Publisher,
-    is_revocable_type: Table<String, bool>,
-    is_revoked: Table<ID, bool>,
+    is_registered: Table<String, bool>,
 }
 
 /// Attestation type
 public struct AttestationType has key {
     id: UID,
-    is_revocable: bool,
     type_name: String,
+    is_revocable: bool,
 }
 
 /// Meta attestation type
 public struct Attestation<T: store> has key {
     id: UID,
-    to: address,
-    author: address,
+    receiver: address,
+    created_by: address,
     data: T,
+}
+
+// Meta revocation type
+public struct Revocation has key {
+    id: UID,
+    receiver: address,
+    revoked_by: address,
 }
 
 /// Event emitted when an Attestation is created
 public struct AttestationCreated has copy, drop {
-    id: ID,
-    to: address,
-    author: address,
+    attestation_id: ID,
+    receiver: address,
+    created_by: address,
 }
 
 /// Event emitted when an Attestation is revoked
 public struct AttestationRevoked has copy, drop {
-    id: ID,
-    to: address,
-    author: address,
+    attestation_id: ID,
+    receiver: address,
     revoked_by: address,
 }
 
@@ -66,8 +71,7 @@ fun init(otw: ATTESTATION, ctx: &mut TxContext) {
     let registry = Registry {
         id: object::new(ctx),
         publisher,
-        is_revocable_type: table::new<String, bool>(ctx),
-        is_revoked: table::new<ID, bool>(ctx),
+        is_registered: table::new<String, bool>(ctx),
     };
 
     transfer::share_object(registry);
@@ -87,14 +91,14 @@ public fun register_type<T: key + store>(
 
     // Add type to the registry if it wasn't already
     let type_name = get_type_name<T>().into_string();
-    assert!(!table::contains(&registry.is_revocable_type, type_name), EUnknownAttestationType);
-    table::add(&mut registry.is_revocable_type, type_name, is_revocable);
+    assert!(!table::contains(&registry.is_registered, type_name), EAlreadyRegistered);
+    table::add(&mut registry.is_registered, type_name, true);
 
     // Create and freeze newly registered type
     let attestation_type = AttestationType {
         id: object::new(ctx),
-        is_revocable,
         type_name,
+        is_revocable,
     };
     transfer::freeze_object(attestation_type);
 
@@ -105,60 +109,59 @@ public fun register_type<T: key + store>(
 
 /// Create attestation
 public fun attest<T: key + store>(
-    to: address,
     data: T,
-    registry: &Registry,
+    receiver: address,
+    attestation_type: &AttestationType,
     ctx: &mut TxContext,
 ) {
     // Abort if the type was not previosly created via `register_type`
     let type_name = get_type_name<T>().into_string();
-    assert!(table::contains(&registry.is_revocable_type, type_name), EUnknownAttestationType);
+    assert!(attestation_type.type_name == type_name, EUnknownAttestationType);
 
     // Create and send over the attestation
-    let sender = ctx.sender();
+    let created_by = ctx.sender();
     let attestation = Attestation {
         id: object::new(ctx),
-        to: to,
-        author: sender,
+        created_by,
+        receiver,
         data,
     };
     event::emit(AttestationCreated {
-        id: object::id(&attestation),
-        to: to,
-        author: sender,
+        attestation_id: object::id(&attestation),
+        receiver,
+        created_by,
     });
-    transfer::transfer(attestation, to);
+    transfer::transfer(attestation, receiver);
 }
 
 /// Revoke attestation
 public fun revoke<T: key + store>(
     attestation: &Attestation<T>,
-    registry: &mut Registry,
+    attestation_type: &AttestationType,
     ctx: &mut TxContext,
 ) {
     // Abort if author mismatch
-    assert!(attestation.author == ctx.sender(), EAttestationAuthorMismatch);
+    assert!(attestation.created_by == ctx.sender(), EAttestationAuthorMismatch);
 
     // Abort if the type was not previosly created via `register_type`
     let type_name = get_type_name<T>().into_string();
-    assert!(table::contains(&registry.is_revocable_type, type_name), EUnknownAttestationType);
+    assert!(attestation_type.type_name == type_name, EUnknownAttestationType);
 
     // Abort if non-revocable type
-    let is_revocable_type = table::borrow(&registry.is_revocable_type, type_name);
-    assert!(is_revocable_type == true, ENotRevocableType);
+    assert!(attestation_type.is_revocable == true, ENotRevocableType);
 
-    // Abort if already revoked
-    let has_revoke_key = table::contains(&registry.is_revoked, object::id(attestation));
-    assert!(has_revoke_key != true, EAttestationAlreadyRevoked);
-    table::add(&mut registry.is_revoked, object::id(attestation), true);
-
-    // Emit
+    // Create and send over the revocation
+    let revocation = Revocation {
+        id: object::new(ctx),
+        receiver: attestation.receiver,
+        revoked_by: ctx.sender(),
+    };
     event::emit(AttestationRevoked {
-        id: object::id(attestation),
-        to: attestation.to,
-        author: attestation.author,
+        attestation_id: object::id(attestation),
+        receiver: attestation.receiver,
         revoked_by: ctx.sender(),
     });
+    transfer::transfer(revocation, attestation.receiver);
 }
 
 #[test_only]

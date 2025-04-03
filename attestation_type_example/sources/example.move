@@ -2,7 +2,7 @@ module attestation_type_example::example;
 
 use sui::package::{Self, Publisher};
 use std::ascii::{String};
-use attestation::attestation::{Self, Registry};
+use attestation::attestation::{Self, Registry, AttestationType};
 
 /// Attestation type
 public struct ExampleAttestion has key, store {
@@ -48,19 +48,25 @@ public fun register_itself(
 
 /// Create attestation
 public fun attest(
-    to: address,
+    receiver: address,
     what: String,
-    registry: &mut Registry,
+    attestation_type: &AttestationType,
     ctx: &mut TxContext,
 ) {
-    let attestation_object = ExampleAttestion {
+    let attestation_data = ExampleAttestion {
         id: object::new(ctx),
         what,
     };
     attestation::attest<ExampleAttestion>(
-        to,
-        attestation_object,
-        registry,
+        attestation_data,
+        receiver,
+        attestation_type,
         ctx,
     )
+}
+
+#[test_only]
+/// Wrapper of module initializer for testing
+public fun test_init(ctx: &mut TxContext) {
+    init(EXAMPLE {}, ctx)
 }
