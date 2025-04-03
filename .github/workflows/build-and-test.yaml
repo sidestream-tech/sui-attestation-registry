@@ -1,0 +1,33 @@
+name: build and test
+
+on:
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        ref: ${{ github.event.pull_request.head.sha }}
+
+    - name: Download and extract Sui CLI
+      run: |
+        url="https://github.com/MystenLabs/sui/releases/download/testnet-v1.46.0/sui-testnet-v1.46.0-ubuntu-x86_64.tgz"
+        wget -nv "$url" -O cli.tgz
+        tar -xzf cli.tgz
+        chmod +x sui
+        sudo mv sui /usr/local/bin/
+        sui --version # ensure CLI works as expected
+
+    - name: Test attestation package
+      working-directory: ./attestation
+      run: sui move test --skip-fetch-latest-git-deps --lint --warnings-are-errors
+
+    - name: Test attestation_type_example package
+      working-directory: ./attestation_type_example
+      run: sui move test --skip-fetch-latest-git-deps --lint --warnings-are-errors
