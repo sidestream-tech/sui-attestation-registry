@@ -3,7 +3,7 @@ module attestation::attestation;
 use sui::display::{Self};
 use sui::package::{Self, Publisher};
 use std::ascii::{String};
-use sui::table::{Self, Table};
+use sui::vec_set::{Self, VecSet};
 use std::type_name::{get as get_type_name};
 
 /// Not a valid owner of the publisher object
@@ -21,7 +21,7 @@ const EAttestationAuthorMismatch: u64 = 5;
 public struct Registry has key {
     id: UID,
     publisher: Publisher,
-    is_registered: Table<String, bool>,
+    registered_types: VecSet<String>,
 }
 
 /// Attestation type
@@ -57,7 +57,7 @@ fun init(otw: ATTESTATION, ctx: &mut TxContext) {
     let registry = Registry {
         id: object::new(ctx),
         publisher,
-        is_registered: table::new<String, bool>(ctx),
+        registered_types: vec_set::empty<String>(),
     };
 
     transfer::share_object(registry);
@@ -77,8 +77,8 @@ public fun register_type<T: key + store>(
 
     // Add type to the registry if it wasn't already
     let type_name = get_type_name<T>().into_string();
-    assert!(!registry.is_registered.contains(type_name), EAlreadyRegistered);
-    table::add(&mut registry.is_registered, type_name, true);
+    assert!(!registry.registered_types.contains(&type_name), EAlreadyRegistered);
+    vec_set::insert(&mut registry.registered_types, type_name);
 
     // Create and freeze newly registered type
     let attestation_type = AttestationType {
