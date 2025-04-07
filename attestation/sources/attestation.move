@@ -77,7 +77,7 @@ public fun register_type<T: key + store>(
 
     // Add type to the registry if it wasn't already
     let type_name = get_type_name<T>().into_string();
-    assert!(!table::contains(&registry.is_registered, type_name), EAlreadyRegistered);
+    assert!(!registry.is_registered.contains(type_name), EAlreadyRegistered);
     table::add(&mut registry.is_registered, type_name, true);
 
     // Create and freeze newly registered type
