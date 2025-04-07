@@ -39,11 +39,12 @@ public struct Attestation<T: store> has key {
     data: T,
 }
 
-// Meta revocation type
+/// Meta revocation type
 public struct Revocation has key {
     id: UID,
     receiver: address,
     revoked_by: address,
+    revoked: ID,
 }
 
 /// OTW to claim publisher
@@ -135,6 +136,7 @@ public fun revoke<T: key + store>(
         id: object::new(ctx),
         receiver: attestation.receiver,
         revoked_by: ctx.sender(),
+        revoked: object::id(attestation),
     };
     transfer::transfer(revocation, attestation.receiver);
 }
