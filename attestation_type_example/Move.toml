@@ -7,7 +7,6 @@ authors = [
 ] # e.g., ["Joe Smith (joesmith@noemail.com)", "John Snow (johnsnow@noemail.com)"]
 
 [dependencies]
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet", override = true }
 attestation = { local = "../attestation" }
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
