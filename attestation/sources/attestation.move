@@ -12,10 +12,8 @@ const EInvalidPublisher: u64 = 1;
 const EAlreadyRegistered: u64 = 2;
 /// Attestation type of type T was not registered
 const EUnknownAttestationType: u64 = 3;
-/// Attestation type registered as non-revocable
-const ENotRevocableType: u64 = 4;
 /// Only authors can revoke their attestations
-const EAttestationAuthorMismatch: u64 = 5;
+const EAttestationRevokeCapMismatch: u64 = 4;
 
 /// Shared registry object
 public struct Registry has key {
@@ -28,10 +26,9 @@ public struct Registry has key {
 public struct AttestationType has key {
     id: UID,
     type_name: String,
-    is_revocable: bool,
 }
 
-/// Meta attestation type
+/// Meta object holding attestation data
 public struct Attestation<T: store> has key {
     id: UID,
     receiver: address,
@@ -39,12 +36,18 @@ public struct Attestation<T: store> has key {
     data: T,
 }
 
-/// Meta revocation type
+/// Object returned when attestation is created
+public struct RevokeCap has key, store {
+    id: UID,
+    attestation: ID,
+}
+
+/// Object sent to receiver when original attestation is revoked
 public struct Revocation has key {
     id: UID,
     receiver: address,
     revoked_by: address,
-    revoked: ID,
+    attestation: ID,
 }
 
 /// OTW to claim publisher
@@ -66,7 +69,6 @@ fun init(otw: ATTESTATION, ctx: &mut TxContext) {
 /// Register attestation type and its Display
 public fun register_type<T: key + store>(
     publisher: &Publisher,
-    is_revocable: bool,
     fields: vector<std::string::String>,
     values: vector<std::string::String>,
     registry: &mut Registry,
@@ -84,7 +86,6 @@ public fun register_type<T: key + store>(
     let attestation_type = AttestationType {
         id: object::new(ctx),
         type_name,
-        is_revocable,
     };
     transfer::freeze_object(attestation_type);
 
@@ -99,46 +100,54 @@ public fun attest<T: key + store>(
     receiver: address,
     attestation_type: &AttestationType,
     ctx: &mut TxContext,
-) {
+): RevokeCap {
     // Abort if the type was not previosly created via `register_type`
     let type_name = get_type_name<T>().into_string();
     assert!(attestation_type.type_name == type_name, EUnknownAttestationType);
 
-    // Create and send over the attestation
-    let created_by = ctx.sender();
+    // Create attestation
     let attestation = Attestation {
         id: object::new(ctx),
-        created_by,
+        created_by: ctx.sender(),
         receiver,
         data,
     };
+
+    // Create revocation capability
+    let revoke_cap = RevokeCap {
+        id: object::new(ctx),
+        attestation: object::id(&attestation),
+    };
+
+    // Send attestation to receiver
     transfer::transfer(attestation, receiver);
+
+    // Return revocation capability
+    revoke_cap
 }
 
 /// Revoke attestation
 public fun revoke<T: key + store>(
     attestation: &Attestation<T>,
-    attestation_type: &AttestationType,
+    revoke_cap: RevokeCap,
     ctx: &mut TxContext,
-) {
-    // Abort if author mismatch
-    assert!(attestation.created_by == ctx.sender(), EAttestationAuthorMismatch);
-
-    // Abort if the type was not previosly created via `register_type`
-    let type_name = get_type_name<T>().into_string();
-    assert!(attestation_type.type_name == type_name, EUnknownAttestationType);
-
-    // Abort if non-revocable type
-    assert!(attestation_type.is_revocable == true, ENotRevocableType);
+): RevokeCap {
+    let attestation_id = object::id(attestation);
+    
+    // Abort if revoke_cap from a different attestation
+    assert!(revoke_cap.attestation == attestation_id, EAttestationRevokeCapMismatch);
 
     // Create and send over the revocation
     let revocation = Revocation {
         id: object::new(ctx),
         receiver: attestation.receiver,
         revoked_by: ctx.sender(),
-        revoked: object::id(attestation),
+        attestation: attestation_id,
     };
     transfer::transfer(revocation, attestation.receiver);
+
+    // Return revocation capability back
+    revoke_cap
 }
 
 #[test_only]

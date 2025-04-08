@@ -4,7 +4,7 @@ module attestation::attestation_tests;
 /// Imports
 use sui::test_scenario;
 use sui::package::{Self, Publisher};
-use attestation::attestation::{Self, Registry, Attestation, AttestationType};
+use attestation::attestation::{Self, Registry, Attestation, AttestationType, RevokeCap};
 
 /// Test attestation type
 public struct TestAttestion has key, store {
@@ -50,7 +50,6 @@ fun test_happy_path() {
         // Try to create type
         attestation::register_type<TestAttestion>(
             &type_publisher,
-            true,
             vector[],
             vector[],
             &mut package_registry,
@@ -68,7 +67,7 @@ fun test_happy_path() {
         // Borrow required objects
         let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
         
-        attestation::attest<TestAttestion>(
+        let revoke_cap = attestation::attest<TestAttestion>(
             TestAttestion {
                 id: object::new(test_scenario::ctx(&mut scenario)),
                 is_good: true
@@ -77,6 +76,7 @@ fun test_happy_path() {
             &attestation_type,
             test_scenario::ctx(&mut scenario),
         );
+        transfer::public_transfer(revoke_cap, attestation_creator);
 
         // Return borrowed
         test_scenario::return_immutable(attestation_type);
@@ -86,17 +86,17 @@ fun test_happy_path() {
     // Revoke previously created attestation
     {
         // Borrow required objects
-        let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
         let attestation = test_scenario::take_from_address<Attestation<TestAttestion>>(&scenario, attestation_receiver);
+        let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
 
-        attestation::revoke<TestAttestion>(
+        let returned_revoke_cap = attestation::revoke<TestAttestion>(
             &attestation,
-            &attestation_type,
+            revoke_cap,
             test_scenario::ctx(&mut scenario),
         );
 
         // Return borrowed
-        test_scenario::return_immutable(attestation_type);
+        test_scenario::return_to_address(attestation_creator, returned_revoke_cap);
         test_scenario::return_to_address<Attestation<TestAttestion>>(attestation_receiver, attestation);
     };
 
