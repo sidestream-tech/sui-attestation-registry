@@ -2,7 +2,7 @@ module attestation_type_example::example;
 
 use sui::package::{Self, Publisher};
 use std::ascii::{String};
-use attestation::attestation::{Self, Registry, AttestationType};
+use attestation::attestation::{Self, Registry, AttestationType, RevokeCap};
 
 /// Attestation type
 public struct ExampleAttestion has key, store {
@@ -25,7 +25,6 @@ public fun register_itself(
     registry: &mut Registry,
     ctx: &mut TxContext,
 ) {
-    let is_revocable = true;
     let fields = vector[
         b"name".to_string(),
         b"description".to_string(),
@@ -38,7 +37,6 @@ public fun register_itself(
     ];
     attestation::register_type<ExampleAttestion>(
         publisher,
-        is_revocable,
         fields,
         values,
         registry,
@@ -52,7 +50,7 @@ public fun attest(
     what: String,
     attestation_type: &AttestationType,
     ctx: &mut TxContext,
-) {
+): RevokeCap {
     let attestation_data = ExampleAttestion {
         id: object::new(ctx),
         what,

@@ -5,8 +5,8 @@ module attestation_type_example::example_tests;
 use sui::test_scenario;
 use std::ascii;
 use sui::package::{Publisher};
-use attestation::attestation::{Self, Registry, AttestationType};
-use attestation_type_example::example::{Self};
+use attestation::attestation::{Self, Registry, Attestation, AttestationType, RevokeCap};
+use attestation_type_example::example::{Self, ExampleAttestion};
 
 #[test]
 fun test_happy_path() {
@@ -47,7 +47,7 @@ fun test_happy_path() {
         let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
 
         // Try to create attestation
-        example::attest(
+        let revoke_cap = example::attest(
             attestation_receiver,
             ascii::string(b"test"),
             &attestation_type,
@@ -56,6 +56,26 @@ fun test_happy_path() {
 
         // Return borrowed
         test_scenario::return_immutable(attestation_type);
+        transfer::public_transfer(revoke_cap, attestation_creator);
+    };
+
+    scenario.next_tx(attestation_creator);
+    // Revoke attestation
+    {
+        // Borrow required objects
+        let attestation = test_scenario::take_from_address<Attestation<ExampleAttestion>>(&scenario, attestation_receiver);
+        let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
+
+        // Try to revoke attestation
+        let returned_revoke_cap = attestation::revoke(
+            &attestation,
+            revoke_cap,
+            test_scenario::ctx(&mut scenario),
+        );
+
+        // Return borrowed
+        test_scenario::return_to_address<RevokeCap>(attestation_creator, returned_revoke_cap);
+        test_scenario::return_to_address<Attestation<ExampleAttestion>>(attestation_receiver, attestation);
     };
 
     scenario.end();
