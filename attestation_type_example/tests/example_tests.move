@@ -34,10 +34,9 @@ fun test_happy_path() {
         let type_publisher = test_scenario::take_from_address<Publisher>(&scenario, type_creator);
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
 
-        example::register_itself(&type_publisher, &mut package_registry, test_scenario::ctx(&mut scenario));
+        example::register_itself(type_publisher, &mut package_registry, test_scenario::ctx(&mut scenario));
 
         test_scenario::return_shared(package_registry);
-        test_scenario::return_to_address<Publisher>(type_creator, type_publisher);
     };
 
     scenario.next_tx(attestation_creator);

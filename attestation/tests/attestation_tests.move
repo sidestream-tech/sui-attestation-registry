@@ -49,7 +49,7 @@ fun test_happy_path() {
 
         // Try to create type
         attestation::register_type<TestAttestion>(
-            &type_publisher,
+            type_publisher,
             vector[],
             vector[],
             &mut package_registry,
@@ -58,7 +58,6 @@ fun test_happy_path() {
 
         // Return borrowed
         test_scenario::return_shared(package_registry);
-        test_scenario::return_to_address<Publisher>(type_creator, type_publisher);
     };
 
     scenario.next_tx(attestation_creator);

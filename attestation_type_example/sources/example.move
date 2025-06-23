@@ -21,7 +21,7 @@ fun init(otw: EXAMPLE, ctx: &mut TxContext) {
 
 /// Create attestation type and its Display
 public fun register_itself(
-    publisher: &Publisher,
+    publisher: Publisher,
     registry: &mut Registry,
     ctx: &mut TxContext,
 ) {

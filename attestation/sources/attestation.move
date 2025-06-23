@@ -3,29 +3,26 @@ module attestation::attestation;
 use sui::display::{Self};
 use sui::package::{Self, Publisher};
 use std::ascii::{String};
-use sui::table::{Self, Table};
 use std::type_name::{get as get_type_name};
 
 /// Not a valid owner of the publisher object
 const EInvalidPublisher: u64 = 1;
-/// Attestation type of type T was already registered
-const EAlreadyRegistered: u64 = 2;
 /// Attestation type of type T was not registered
-const EUnknownAttestationType: u64 = 3;
+const EUnknownAttestationType: u64 = 2;
 /// Only authors can revoke their attestations
-const EAttestationRevokeCapMismatch: u64 = 4;
+const EAttestationRevokeCapMismatch: u64 = 3;
 
 /// Shared registry object
 public struct Registry has key {
     id: UID,
     publisher: Publisher,
-    is_registered: Table<String, bool>,
 }
 
 /// Attestation type
 public struct AttestationType has key {
     id: UID,
     type_name: String,
+    publisher: Publisher,
 }
 
 /// Meta object holding attestation data
@@ -60,15 +57,15 @@ fun init(otw: ATTESTATION, ctx: &mut TxContext) {
     let registry = Registry {
         id: object::new(ctx),
         publisher,
-        is_registered: table::new<String, bool>(ctx),
     };
 
     transfer::share_object(registry);
 }
 
 /// Register attestation type and its Display
+#[allow(lint(freeze_wrapped))]
 public fun register_type<T: key + store>(
-    publisher: &Publisher,
+    publisher: Publisher,
     fields: vector<std::string::String>,
     values: vector<std::string::String>,
     registry: &mut Registry,
@@ -77,20 +74,17 @@ public fun register_type<T: key + store>(
     // Ensure `T` type belongs to the provided `publisher`
     assert!(publisher.from_module<T>(), EInvalidPublisher);
 
-    // Add type to the registry if it wasn't already
-    let type_name = get_type_name<T>().into_string();
-    assert!(!registry.is_registered.contains(type_name), EAlreadyRegistered);
-    table::add(&mut registry.is_registered, type_name, true);
-
     // Create and freeze newly registered type
     let attestation_type = AttestationType {
         id: object::new(ctx),
-        type_name,
+        type_name: get_type_name<T>().into_string(),
+        publisher,
     };
     transfer::freeze_object(attestation_type);
 
     // Create and freeze Display for the type
-    let typeDisplay = display::new_with_fields<Attestation<T>>(&registry.publisher, fields, values, ctx);
+    let mut typeDisplay = display::new_with_fields<Attestation<T>>(&registry.publisher, fields, values, ctx);
+    typeDisplay.update_version();
     transfer::public_freeze_object(typeDisplay);
 }
 
