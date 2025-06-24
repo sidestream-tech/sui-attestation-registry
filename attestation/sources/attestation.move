@@ -1,21 +1,22 @@
 module attestation::attestation;
 
-use sui::display::{Self};
-use sui::package::{Self, Publisher};
 use std::ascii::{String};
 use std::type_name::{get as get_type_name};
+use sui::display::{Self};
+use sui::package::{Self, Publisher};
+use sui::table::{Self, Table};
+use sui::bag::{Self, Bag};
 
 /// Not a valid owner of the publisher object
 const EInvalidPublisher: u64 = 1;
-/// Attestation type of type T was not registered
-const EUnknownAttestationType: u64 = 2;
-/// Only authors can revoke their attestations
-const EAttestationRevokeCapMismatch: u64 = 3;
+/// AttestationType does not match provided T
+const EInvalidAttestationType: u64 = 2;
 
 /// Shared registry object
 public struct Registry has key {
     id: UID,
     publisher: Publisher,
+    attestations: Table<address /* package */, Bag /* sender, Attestation<T> */>,
 }
 
 /// Attestation type
@@ -26,25 +27,19 @@ public struct AttestationType has key {
 }
 
 /// Meta object holding attestation data
-public struct Attestation<T: store> has key {
+public struct Attestation<T: store> has key, store {
     id: UID,
     receiver: address,
     created_by: address,
+    revoked_by: Option<address>,
     data: T,
 }
 
 /// Object returned when attestation is created
 public struct RevokeCap has key, store {
     id: UID,
-    attestation: ID,
-}
-
-/// Object sent to receiver when original attestation is revoked
-public struct Revocation has key {
-    id: UID,
     receiver: address,
-    revoked_by: address,
-    attestation: ID,
+    attestation_id: ID,
 }
 
 /// OTW to claim publisher
@@ -57,6 +52,7 @@ fun init(otw: ATTESTATION, ctx: &mut TxContext) {
     let registry = Registry {
         id: object::new(ctx),
         publisher,
+        attestations: table::new<address, Bag>(ctx),
     };
 
     transfer::share_object(registry);
@@ -93,55 +89,61 @@ public fun attest<T: key + store>(
     data: T,
     receiver: address,
     attestation_type: &AttestationType,
+    registry: &mut Registry,
     ctx: &mut TxContext,
 ): RevokeCap {
     // Abort if the type was not previosly created via `register_type`
     let type_name = get_type_name<T>().into_string();
-    assert!(attestation_type.type_name == type_name, EUnknownAttestationType);
+    assert!(attestation_type.type_name == type_name, EInvalidAttestationType);
 
     // Create attestation
     let attestation = Attestation {
         id: object::new(ctx),
         created_by: ctx.sender(),
+        revoked_by: option::none(),
         receiver,
         data,
     };
+    let attestation_id = object::id(&attestation);
 
     // Create revocation capability
     let revoke_cap = RevokeCap {
         id: object::new(ctx),
-        attestation: object::id(&attestation),
+        receiver,
+        attestation_id,
     };
 
-    // Send attestation to receiver
-    transfer::transfer(attestation, receiver);
+    // Store attestation in the registry
+    if (!registry.attestations.contains(receiver)) {
+        // if it's the first attestation for this package, create a new bag
+        let mut package_bag = bag::new(ctx);
+        package_bag.add(attestation_id, attestation);
+        registry.attestations.add(receiver, package_bag);
+    } else {
+        // else, borrow existing bag
+        let package_bag = registry.attestations.borrow_mut(receiver);
+        package_bag.add(attestation_id, attestation);
+    };
 
     // Return revocation capability
     revoke_cap
 }
 
 /// Revoke attestation
+#[allow(lint(freezing_capability))]
 public fun revoke<T: key + store>(
-    attestation: &Attestation<T>,
     revoke_cap: RevokeCap,
+    registry: &mut Registry,
     ctx: &mut TxContext,
-): RevokeCap {
-    let attestation_id = object::id(attestation);
-    
-    // Abort if revoke_cap from a different attestation
-    assert!(revoke_cap.attestation == attestation_id, EAttestationRevokeCapMismatch);
+) {
+    let package_bag = registry.attestations.borrow_mut(revoke_cap.receiver);
+    let attestation: &mut Attestation<T> = package_bag.borrow_mut(revoke_cap.attestation_id);
 
-    // Create and send over the revocation
-    let revocation = Revocation {
-        id: object::new(ctx),
-        receiver: attestation.receiver,
-        revoked_by: ctx.sender(),
-        attestation: attestation_id,
-    };
-    transfer::transfer(revocation, attestation.receiver);
+    // Modify attestation object
+    attestation.revoked_by = option::some(ctx.sender());
 
-    // Return revocation capability back
-    revoke_cap
+    // Freeze revocation capability, since it can't be used again
+    transfer::public_freeze_object(revoke_cap);
 }
 
 #[test_only]

@@ -49,6 +49,7 @@ public fun attest(
     receiver: address,
     what: String,
     attestation_type: &AttestationType,
+    registry: &mut Registry,
     ctx: &mut TxContext,
 ): RevokeCap {
     let attestation_data = ExampleAttestion {
@@ -59,6 +60,7 @@ public fun attest(
         attestation_data,
         receiver,
         attestation_type,
+        registry,
         ctx,
     )
 }

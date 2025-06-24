@@ -4,7 +4,7 @@ module attestation::attestation_tests;
 /// Imports
 use sui::test_scenario;
 use sui::package::{Self, Publisher};
-use attestation::attestation::{Self, Registry, Attestation, AttestationType, RevokeCap};
+use attestation::attestation::{Self, Registry, AttestationType, RevokeCap};
 
 /// Test attestation type
 public struct TestAttestion has key, store {
@@ -64,6 +64,7 @@ fun test_happy_path() {
     // Create new attestation
     {
         // Borrow required objects
+        let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
         let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
         
         let revoke_cap = attestation::attest<TestAttestion>(
@@ -73,30 +74,31 @@ fun test_happy_path() {
             },
             attestation_receiver,
             &attestation_type,
+            &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
         transfer::public_transfer(revoke_cap, attestation_creator);
 
         // Return borrowed
         test_scenario::return_immutable(attestation_type);
+        test_scenario::return_shared(package_registry);
     };
 
     scenario.next_tx(attestation_creator);
     // Revoke previously created attestation
     {
         // Borrow required objects
-        let attestation = test_scenario::take_from_address<Attestation<TestAttestion>>(&scenario, attestation_receiver);
         let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
+        let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
 
-        let returned_revoke_cap = attestation::revoke<TestAttestion>(
-            &attestation,
+        attestation::revoke<TestAttestion>(
             revoke_cap,
+            &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
 
         // Return borrowed
-        test_scenario::return_to_address(attestation_creator, returned_revoke_cap);
-        test_scenario::return_to_address<Attestation<TestAttestion>>(attestation_receiver, attestation);
+        test_scenario::return_shared(package_registry);
     };
 
     scenario.end();

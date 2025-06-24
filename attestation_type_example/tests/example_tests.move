@@ -5,7 +5,7 @@ module attestation_type_example::example_tests;
 use sui::test_scenario;
 use std::ascii;
 use sui::package::{Publisher};
-use attestation::attestation::{Self, Registry, Attestation, AttestationType, RevokeCap};
+use attestation::attestation::{Self, Registry, AttestationType, RevokeCap};
 use attestation_type_example::example::{Self, ExampleAttestion};
 
 #[test]
@@ -43,6 +43,7 @@ fun test_happy_path() {
     // Attest
     {
         // Borrow required objects
+        let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
         let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
 
         // Try to create attestation
@@ -50,31 +51,32 @@ fun test_happy_path() {
             attestation_receiver,
             ascii::string(b"test"),
             &attestation_type,
+            &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
+        transfer::public_transfer(revoke_cap, attestation_creator);
 
         // Return borrowed
+        test_scenario::return_shared(package_registry);
         test_scenario::return_immutable(attestation_type);
-        transfer::public_transfer(revoke_cap, attestation_creator);
     };
 
     scenario.next_tx(attestation_creator);
     // Revoke attestation
     {
         // Borrow required objects
-        let attestation = test_scenario::take_from_address<Attestation<ExampleAttestion>>(&scenario, attestation_receiver);
+        let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
         let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
 
         // Try to revoke attestation
-        let returned_revoke_cap = attestation::revoke(
-            &attestation,
+        attestation::revoke<ExampleAttestion>(
             revoke_cap,
+            &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
 
         // Return borrowed
-        test_scenario::return_to_address<RevokeCap>(attestation_creator, returned_revoke_cap);
-        test_scenario::return_to_address<Attestation<ExampleAttestion>>(attestation_receiver, attestation);
+        test_scenario::return_shared(package_registry);
     };
 
     scenario.end();
