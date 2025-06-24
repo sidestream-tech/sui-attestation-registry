@@ -23,12 +23,12 @@ fun init(otw: ATTESTATION_TESTS, ctx: &mut TxContext) {
 
 #[test]
 fun test_happy_path() {
-    let package_creator = @0xA11CE;
+    let registry_creator = @0xA11CE;
     let type_creator = @0xB0B;
     let attestation_creator = @0xCAFE;
     let attestation_receiver = @0xFACE;
 
-    let mut scenario = test_scenario::begin(package_creator);
+    let mut scenario = test_scenario::begin(registry_creator);
     // Publish attestation package
     {
         attestation::test_init(test_scenario::ctx(&mut scenario));

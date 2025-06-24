@@ -8,22 +8,24 @@ use sui::table::{Self, Table};
 use sui::bag::{Self, Bag};
 
 /// Not a valid owner of the publisher object
-const EInvalidPublisher: u64 = 1;
+const EInvalidTypePublisher: u64 = 1;
 /// AttestationType does not match provided T
 const EInvalidAttestationType: u64 = 2;
+/// Provided publisher does not match attested receiver
+const EInvalidReceiverPublisher: u64 = 3;
 
 /// Shared registry object
 public struct Registry has key {
     id: UID,
     publisher: Publisher,
-    attestations: Table<address /* package */, Bag /* sender, Attestation<T> */>,
+    attestations: Table<address /* package */, Bag /* ID, Attestation<T> */>,
 }
 
 /// Attestation type
 public struct AttestationType has key {
     id: UID,
     type_name: String,
-    publisher: Publisher,
+    type_publisher: Publisher,
 }
 
 /// Meta object holding attestation data
@@ -33,6 +35,7 @@ public struct Attestation<T: store> has key, store {
     created_by: address,
     revoked_by: Option<address>,
     data: T,
+    is_pinned: bool,
 }
 
 /// Object returned when attestation is created
@@ -61,20 +64,20 @@ fun init(otw: ATTESTATION, ctx: &mut TxContext) {
 /// Register attestation type and its Display
 #[allow(lint(freeze_wrapped))]
 public fun register_type<T: key + store>(
-    publisher: Publisher,
+    type_publisher: Publisher,
     fields: vector<std::string::String>,
     values: vector<std::string::String>,
     registry: &mut Registry,
     ctx: &mut TxContext,
 ) {
     // Ensure `T` type belongs to the provided `publisher`
-    assert!(publisher.from_module<T>(), EInvalidPublisher);
+    assert!(type_publisher.from_module<T>(), EInvalidTypePublisher);
 
     // Create and freeze newly registered type
     let attestation_type = AttestationType {
         id: object::new(ctx),
         type_name: get_type_name<T>().into_string(),
-        publisher,
+        type_publisher,
     };
     transfer::freeze_object(attestation_type);
 
@@ -103,6 +106,7 @@ public fun attest<T: key + store>(
         revoked_by: option::none(),
         receiver,
         data,
+        is_pinned: false,
     };
     let attestation_id = object::id(&attestation);
 
@@ -129,7 +133,7 @@ public fun attest<T: key + store>(
     revoke_cap
 }
 
-/// Revoke attestation
+/// Revoke attestation (using RevokeCap)
 #[allow(lint(freezing_capability))]
 public fun revoke<T: key + store>(
     revoke_cap: RevokeCap,
@@ -144,6 +148,40 @@ public fun revoke<T: key + store>(
 
     // Freeze revocation capability, since it can't be used again
     transfer::public_freeze_object(revoke_cap);
+}
+
+/// Pin attestation (using Publisher of the attestation.receiver)
+public fun pin<T: key + store>(
+    receiver_publisher: Publisher,
+    attestation: &Attestation<T>,
+    registry: &mut Registry
+): Publisher {
+    assert!(receiver_publisher.published_package() == attestation.receiver.to_ascii_string(), EInvalidReceiverPublisher);
+    let package_bag = registry.attestations.borrow_mut(attestation.receiver);
+    let attestation: &mut Attestation<T> = package_bag.borrow_mut(object::id(attestation));
+
+    // Modify attestation object
+    attestation.is_pinned = true;
+
+    // Return provided receiver publisher
+    receiver_publisher
+}
+
+// Unpin attestation (using Publisher of the attestation.receiver)
+public fun unpin<T: key + store>(
+    receiver_publisher: Publisher,
+    attestation: &Attestation<T>,
+    registry: &mut Registry
+): Publisher {
+    assert!(receiver_publisher.published_package() == attestation.receiver.to_ascii_string(), EInvalidReceiverPublisher);
+    let package_bag = registry.attestations.borrow_mut(attestation.receiver);
+    let attestation: &mut Attestation<T> = package_bag.borrow_mut(object::id(attestation));
+
+    // Modify attestation object
+    attestation.is_pinned = false;
+
+    // Return provided receiver publisher
+    receiver_publisher
 }
 
 #[test_only]
