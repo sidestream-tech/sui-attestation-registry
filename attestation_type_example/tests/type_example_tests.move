@@ -1,12 +1,12 @@
 #[test_only]
-module attestation_type_example::example_tests;
+module attestation_type_example::type_example_tests;
 
 /// Imports
 use sui::test_scenario;
 use std::ascii;
 use sui::package::{Publisher};
 use attestation::attestation::{Self, Registry, AttestationType, RevokeCap};
-use attestation_type_example::example::{Self, ExampleAttestion};
+use attestation_type_example::type_example::{Self, ExampleAttestation};
 
 #[test]
 fun test_happy_path() {
@@ -24,7 +24,7 @@ fun test_happy_path() {
     scenario.next_tx(type_creator);
     // Publish type package
     {
-        example::test_init(test_scenario::ctx(&mut scenario));
+        type_example::test_init(test_scenario::ctx(&mut scenario));
     };
 
     scenario.next_tx(type_creator);
@@ -34,7 +34,7 @@ fun test_happy_path() {
         let type_publisher = test_scenario::take_from_address<Publisher>(&scenario, type_creator);
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
 
-        example::register_itself(type_publisher, &mut package_registry, test_scenario::ctx(&mut scenario));
+        type_example::register_itself(type_publisher, &mut package_registry, test_scenario::ctx(&mut scenario));
 
         test_scenario::return_shared(package_registry);
     };
@@ -47,7 +47,7 @@ fun test_happy_path() {
         let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
 
         // Try to create attestation
-        let revoke_cap = example::attest(
+        let revoke_cap = type_example::attest(
             attestation_receiver,
             ascii::string(b"test"),
             &attestation_type,
@@ -69,7 +69,7 @@ fun test_happy_path() {
         let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
 
         // Try to revoke attestation
-        attestation::revoke<ExampleAttestion>(
+        attestation::revoke<ExampleAttestation>(
             revoke_cap,
             &mut package_registry,
             test_scenario::ctx(&mut scenario),

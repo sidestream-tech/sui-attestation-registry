@@ -1,20 +1,20 @@
-module attestation_type_example::example;
+module attestation_type_example::type_example;
 
 use sui::package::{Self, Publisher};
 use std::ascii::{String};
 use attestation::attestation::{Self, Registry, AttestationType, RevokeCap};
 
 /// Attestation type
-public struct ExampleAttestion has key, store {
+public struct ExampleAttestation has key, store {
     id: UID,
     what: String,
 }
 
 /// OTW to claim publisher
-public struct EXAMPLE has drop {}
+public struct TYPE_EXAMPLE has drop {}
 
 /// Initilise the module by claiming publisher object
-fun init(otw: EXAMPLE, ctx: &mut TxContext) {
+fun init(otw: TYPE_EXAMPLE, ctx: &mut TxContext) {
     let publisher = package::claim(otw, ctx);
     transfer::public_transfer(publisher, ctx.sender());
 }
@@ -35,7 +35,7 @@ public fun register_itself(
         b"Test usage of the Attesation package".to_string(),
         b"https://example.com/attestation/{id}".to_string(),
     ];
-    attestation::register_type<ExampleAttestion>(
+    attestation::register_type<ExampleAttestation>(
         publisher,
         fields,
         values,
@@ -52,11 +52,11 @@ public fun attest(
     registry: &mut Registry,
     ctx: &mut TxContext,
 ): RevokeCap {
-    let attestation_data = ExampleAttestion {
+    let attestation_data = ExampleAttestation {
         id: object::new(ctx),
         what,
     };
-    attestation::attest<ExampleAttestion>(
+    attestation::attest<ExampleAttestation>(
         attestation_data,
         receiver,
         attestation_type,
@@ -68,5 +68,5 @@ public fun attest(
 #[test_only]
 /// Wrapper of module initializer for testing
 public fun test_init(ctx: &mut TxContext) {
-    init(EXAMPLE {}, ctx)
+    init(TYPE_EXAMPLE {}, ctx)
 }

@@ -31,3 +31,7 @@ jobs:
     - name: Test attestation_type_example package
       working-directory: ./attestation_type_example
       run: sui move test --skip-fetch-latest-git-deps --lint --warnings-are-errors
+
+    - name: Test attestation_pinning_example package
+      working-directory: ./attestation_pinning_example
+      run: sui move test --skip-fetch-latest-git-deps --lint --warnings-are-errors

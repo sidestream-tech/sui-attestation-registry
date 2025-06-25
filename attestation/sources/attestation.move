@@ -18,7 +18,7 @@ const EInvalidReceiverPublisher: u64 = 3;
 public struct Registry has key {
     id: UID,
     publisher: Publisher,
-    attestations: Table<address /* package */, Bag /* ID, Attestation<T> */>,
+    attestations: Table<address /* package */, Bag /* created_by, Attestation<T> */>,
 }
 
 /// Attestation type
@@ -32,9 +32,9 @@ public struct AttestationType has key {
 public struct Attestation<T: store> has key, store {
     id: UID,
     receiver: address,
+    data: T,
     created_by: address,
     revoked_by: Option<address>,
-    data: T,
     is_pinned: bool,
 }
 
@@ -43,6 +43,7 @@ public struct RevokeCap has key, store {
     id: UID,
     receiver: address,
     attestation_id: ID,
+    created_by: address,
 }
 
 /// OTW to claim publisher
@@ -102,31 +103,31 @@ public fun attest<T: key + store>(
     // Create attestation
     let attestation = Attestation {
         id: object::new(ctx),
-        created_by: ctx.sender(),
-        revoked_by: option::none(),
         receiver,
         data,
+        created_by: ctx.sender(),
+        revoked_by: option::none(),
         is_pinned: false,
     };
-    let attestation_id = object::id(&attestation);
 
     // Create revocation capability
     let revoke_cap = RevokeCap {
         id: object::new(ctx),
         receiver,
-        attestation_id,
+        attestation_id: object::id(&attestation),
+        created_by: ctx.sender(),
     };
 
     // Store attestation in the registry
     if (!registry.attestations.contains(receiver)) {
         // if it's the first attestation for this package, create a new bag
         let mut package_bag = bag::new(ctx);
-        package_bag.add(attestation_id, attestation);
+        package_bag.add(ctx.sender(), attestation);
         registry.attestations.add(receiver, package_bag);
     } else {
         // else, borrow existing bag
         let package_bag = registry.attestations.borrow_mut(receiver);
-        package_bag.add(attestation_id, attestation);
+        package_bag.add(ctx.sender(), attestation);
     };
 
     // Return revocation capability
@@ -141,7 +142,7 @@ public fun revoke<T: key + store>(
     ctx: &mut TxContext,
 ) {
     let package_bag = registry.attestations.borrow_mut(revoke_cap.receiver);
-    let attestation: &mut Attestation<T> = package_bag.borrow_mut(revoke_cap.attestation_id);
+    let attestation: &mut Attestation<T> = package_bag.borrow_mut(revoke_cap.created_by);
 
     // Modify attestation object
     attestation.revoked_by = option::some(ctx.sender());
@@ -152,36 +153,32 @@ public fun revoke<T: key + store>(
 
 /// Pin attestation (using Publisher of the attestation.receiver)
 public fun pin<T: key + store>(
-    receiver_publisher: Publisher,
-    attestation: &Attestation<T>,
+    receiver_publisher: &mut Publisher,
+    attestation_receiver: address,
+    attestation_created_by: address,
     registry: &mut Registry
-): Publisher {
-    assert!(receiver_publisher.published_package() == attestation.receiver.to_ascii_string(), EInvalidReceiverPublisher);
-    let package_bag = registry.attestations.borrow_mut(attestation.receiver);
-    let attestation: &mut Attestation<T> = package_bag.borrow_mut(object::id(attestation));
+) {
+    assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
+    let package_bag = registry.attestations.borrow_mut(attestation_receiver);
+    let attestation: &mut Attestation<T> = package_bag.borrow_mut(attestation_created_by);
 
     // Modify attestation object
     attestation.is_pinned = true;
-
-    // Return provided receiver publisher
-    receiver_publisher
 }
 
 // Unpin attestation (using Publisher of the attestation.receiver)
 public fun unpin<T: key + store>(
-    receiver_publisher: Publisher,
-    attestation: &Attestation<T>,
+    receiver_publisher: &mut Publisher,
+    attestation_receiver: address,
+    attestation_created_by: address,
     registry: &mut Registry
-): Publisher {
-    assert!(receiver_publisher.published_package() == attestation.receiver.to_ascii_string(), EInvalidReceiverPublisher);
-    let package_bag = registry.attestations.borrow_mut(attestation.receiver);
-    let attestation: &mut Attestation<T> = package_bag.borrow_mut(object::id(attestation));
+) {
+    assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
+    let package_bag = registry.attestations.borrow_mut(attestation_receiver);
+    let attestation: &mut Attestation<T> = package_bag.borrow_mut(attestation_created_by);
 
     // Modify attestation object
     attestation.is_pinned = false;
-
-    // Return provided receiver publisher
-    receiver_publisher
 }
 
 #[test_only]

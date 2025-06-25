@@ -1,6 +1,6 @@
 [package]
-name = "attestation_type_example"
-edition = "2024.beta"             # edition = "legacy" to use legacy (pre-2024) Move
+name = "attestation_pinning_example"
+edition = "2024.beta"                # edition = "legacy" to use legacy (pre-2024) Move
 # license = ""           # e.g., "MIT", "GPL", "Apache 2.0"
 authors = [
     "Sidestream Labs https://labs.sidestream.tech",
@@ -8,6 +8,7 @@ authors = [
 
 [dependencies]
 attestation = { local = "../attestation" }
+attestation_type_example = { local = "../attestation_type_example" }
 
 # For remote import, use the `{ git = "...", subdir = "...", rev = "..." }`.
 # Revision can be a branch, a tag, and a commit hash.
@@ -21,7 +22,7 @@ attestation = { local = "../attestation" }
 # Override = { local = "../conflicting/version", override = true }
 
 [addresses]
-attestation_type_example = "0x4"
+attestation_pinning_example = "0x5"
 
 # Named addresses will be accessible in Move as `@name`. They're also exported:
 # for example, `std = "0x1"` is exported by the Standard Library.
