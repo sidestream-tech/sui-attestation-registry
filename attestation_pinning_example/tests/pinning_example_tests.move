@@ -5,7 +5,7 @@ module attestation_pinning_example::pinning_example_tests;
 use std::ascii;
 use sui::test_scenario;
 use sui::package::{Publisher};
-use attestation::attestation::{Self, Registry, AttestationType};
+use attestation::attestation::{Self, Registry, AttestationType, RevokeCap};
 use attestation_type_example::type_example::{Self, ExampleAttestation};
 use attestation_pinning_example::pinning_example::{Self};
 
@@ -75,30 +75,33 @@ fun test_happy_path() {
         // Borrow required objects
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
         let mut receiver_publisher = test_scenario::take_from_address<Publisher>(&scenario, receiver_creator);
+        let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
 
         // Sanity check
-        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_creator, &package_registry) == false);
+        let attestation_id = attestation::get_revoke_cap_attestation_id(&revoke_cap);
+        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_id, &package_registry) == false);
 
         // Pin
         attestation::pin<ExampleAttestation>(
             &mut receiver_publisher,
             attestation_receiver,
-            attestation_creator,
+            attestation_id,
             &mut package_registry,
         );
-        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_creator, &package_registry) == true);
+        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_id, &package_registry) == true);
 
         // Unpin
         attestation::unpin<ExampleAttestation>(
             &mut receiver_publisher,
             attestation_receiver,
-            attestation_creator,
+            attestation_id,
             &mut package_registry,
         );
-        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_creator, &package_registry) == false);
+        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_id, &package_registry) == false);
 
         test_scenario::return_shared(package_registry);
         test_scenario::return_to_address(receiver_creator, receiver_publisher);
+        test_scenario::return_to_address(attestation_creator, revoke_cap);
     };
 
     scenario.end();

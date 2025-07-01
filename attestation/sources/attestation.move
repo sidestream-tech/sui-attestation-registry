@@ -14,7 +14,7 @@ const EInvalidReceiverPublisher: u64 = 2;
 public struct Registry has key {
     id: UID,
     publisher: Publisher,
-    attestations: Table<address /* package */, Bag /* created_by, Attestation<T> */>,
+    attestations: Table<address /* package */, Bag /* attestation_id, Attestation<T> */>,
 }
 
 /// Attestation type
@@ -38,7 +38,6 @@ public struct RevokeCap has key, store {
     id: UID,
     receiver: address,
     attestation_id: ID,
-    created_by: address,
 }
 
 /// OTW to claim publisher
@@ -99,25 +98,25 @@ public fun attest<T: key + store>(
         revoked_by: option::none(),
         is_pinned: false,
     };
+    let attestation_id = object::id(&attestation);
 
     // Create revocation capability
     let revoke_cap = RevokeCap {
         id: object::new(ctx),
         receiver,
-        attestation_id: object::id(&attestation),
-        created_by: ctx.sender(),
+        attestation_id,
     };
 
     // Store attestation in the registry
     if (!registry.attestations.contains(receiver)) {
         // if it's the first attestation for this package, create a new bag
         let mut package_bag = bag::new(ctx);
-        package_bag.add(ctx.sender(), attestation);
+        package_bag.add(attestation_id, attestation);
         registry.attestations.add(receiver, package_bag);
     } else {
         // else, borrow existing bag
         let package_bag = registry.attestations.borrow_mut(receiver);
-        package_bag.add(ctx.sender(), attestation);
+        package_bag.add(attestation_id, attestation);
     };
 
     // Return revocation capability
@@ -132,7 +131,7 @@ public fun revoke<T: key + store>(
     ctx: &mut TxContext,
 ) {
     let package_bag = registry.attestations.borrow_mut(revoke_cap.receiver);
-    let attestation: &mut Attestation<T> = package_bag.borrow_mut(revoke_cap.created_by);
+    let attestation: &mut Attestation<T> = package_bag.borrow_mut(revoke_cap.attestation_id);
 
     // Modify attestation object
     attestation.revoked_by = option::some(ctx.sender());
@@ -145,12 +144,12 @@ public fun revoke<T: key + store>(
 public fun pin<T: key + store>(
     receiver_publisher: &mut Publisher,
     attestation_receiver: address,
-    attestation_created_by: address,
+    attestation_id: ID,
     registry: &mut Registry
 ) {
     assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
     let package_bag = registry.attestations.borrow_mut(attestation_receiver);
-    let attestation: &mut Attestation<T> = package_bag.borrow_mut(attestation_created_by);
+    let attestation: &mut Attestation<T> = package_bag.borrow_mut(attestation_id);
 
     // Modify attestation object
     attestation.is_pinned = true;
@@ -160,12 +159,12 @@ public fun pin<T: key + store>(
 public fun unpin<T: key + store>(
     receiver_publisher: &mut Publisher,
     attestation_receiver: address,
-    attestation_created_by: address,
+    attestation_id: ID,
     registry: &mut Registry
 ) {
     assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
     let package_bag = registry.attestations.borrow_mut(attestation_receiver);
-    let attestation: &mut Attestation<T> = package_bag.borrow_mut(attestation_created_by);
+    let attestation: &mut Attestation<T> = package_bag.borrow_mut(attestation_id);
 
     // Modify attestation object
     attestation.is_pinned = false;
@@ -174,31 +173,38 @@ public fun unpin<T: key + store>(
 /// Return bag with attestations for the given receiver
 public fun get_attestation<T: key + store>(
     receiver: address,
-    created_by: address,
+    attestation_id: ID,
     registry: &Registry
 ): &Attestation<T> {
     let package_bag = registry.attestations.borrow(receiver);
-    package_bag.borrow(created_by)
+    package_bag.borrow(attestation_id)
 }
 
 /// Return attestation.revoked_by field
 public fun get_attestation_revoked_by<T: key + store>(
     receiver: address,
-    created_by: address,
+    attestation_id: ID,
     registry: &Registry
 ): Option<address> {
-    let attestation: &Attestation<T> = get_attestation(receiver, created_by, registry);
+    let attestation: &Attestation<T> = get_attestation(receiver, attestation_id, registry);
     attestation.revoked_by
 }
 
 /// Return attestation.is_pinned field
 public fun get_attestation_is_pinned<T: key + store>(
     receiver: address,
-    created_by: address,
+    attestation_id: ID,
     registry: &Registry
 ): bool {
-    let attestation: &Attestation<T> = get_attestation(receiver, created_by, registry);
+    let attestation: &Attestation<T> = get_attestation(receiver, attestation_id, registry);
     attestation.is_pinned
+}
+
+/// Return revoke_cap.attestation_id field
+public fun get_revoke_cap_attestation_id(
+    revoke_cap: &RevokeCap,
+): ID {
+    revoke_cap.attestation_id
 }
 
 #[test_only]
