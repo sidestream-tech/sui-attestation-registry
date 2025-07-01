@@ -77,9 +77,9 @@ fun test_happy_path() {
             &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
-        transfer::public_transfer(revoke_cap, attestation_creator);
 
         // Return borrowed
+        transfer::public_transfer(revoke_cap, attestation_creator);
         test_scenario::return_immutable(attestation_type);
         test_scenario::return_shared(package_registry);
     };

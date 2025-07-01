@@ -76,18 +76,26 @@ fun test_happy_path() {
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
         let mut receiver_publisher = test_scenario::take_from_address<Publisher>(&scenario, receiver_creator);
 
+        // Sanity check
+        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_creator, &package_registry) == false);
+
+        // Pin
         attestation::pin<ExampleAttestation>(
             &mut receiver_publisher,
             attestation_receiver,
             attestation_creator,
             &mut package_registry,
         );
+        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_creator, &package_registry) == true);
+
+        // Unpin
         attestation::unpin<ExampleAttestation>(
             &mut receiver_publisher,
             attestation_receiver,
             attestation_creator,
             &mut package_registry,
         );
+        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_creator, &package_registry) == false);
 
         test_scenario::return_shared(package_registry);
         test_scenario::return_to_address(receiver_creator, receiver_publisher);

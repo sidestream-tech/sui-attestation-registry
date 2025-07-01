@@ -156,7 +156,7 @@ public fun pin<T: key + store>(
     attestation.is_pinned = true;
 }
 
-// Unpin attestation (using Publisher of the attestation.receiver)
+/// Unpin attestation (using Publisher of the attestation.receiver)
 public fun unpin<T: key + store>(
     receiver_publisher: &mut Publisher,
     attestation_receiver: address,
@@ -169,6 +169,26 @@ public fun unpin<T: key + store>(
 
     // Modify attestation object
     attestation.is_pinned = false;
+}
+
+/// Return bag with attestations for the given receiver
+public fun get_attestation<T: key + store>(
+    receiver: address,
+    created_by: address,
+    registry: &Registry
+): &Attestation<T> {
+    let package_bag = registry.attestations.borrow(receiver);
+    package_bag.borrow(created_by)
+}
+
+/// Return attestation is_pinned field for the given attestation
+public fun get_attestation_is_pinned<T: key + store>(
+    receiver: address,
+    created_by: address,
+    registry: &Registry
+): bool {
+    let attestation: &Attestation<T> = get_attestation(receiver, created_by, registry);
+    attestation.is_pinned
 }
 
 #[test_only]
