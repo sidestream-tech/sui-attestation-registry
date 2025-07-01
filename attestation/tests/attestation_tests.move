@@ -7,7 +7,7 @@ use sui::package::{Self, Publisher};
 use attestation::attestation::{Self, Registry, AttestationType, RevokeCap};
 
 /// Test attestation type
-public struct TestAttestion has key, store {
+public struct TestAttestation has key, store {
     id: UID,
     is_good: bool,
 }
@@ -48,7 +48,7 @@ fun test_happy_path() {
         let type_publisher = test_scenario::take_from_address<Publisher>(&scenario, type_creator);
 
         // Try to create type
-        attestation::register_type<TestAttestion>(
+        attestation::register_type<TestAttestation>(
             type_publisher,
             vector[],
             vector[],
@@ -67,8 +67,8 @@ fun test_happy_path() {
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
         let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
         
-        let revoke_cap = attestation::attest<TestAttestion>(
-            TestAttestion {
+        let revoke_cap = attestation::attest<TestAttestation>(
+            TestAttestation {
                 id: object::new(test_scenario::ctx(&mut scenario)),
                 is_good: true
             },
@@ -91,7 +91,7 @@ fun test_happy_path() {
         let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
 
-        attestation::revoke<TestAttestion>(
+        attestation::revoke<TestAttestation>(
             revoke_cap,
             &mut package_registry,
             test_scenario::ctx(&mut scenario),

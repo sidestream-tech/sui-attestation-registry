@@ -56,7 +56,7 @@ fun init(otw: ATTESTATION, ctx: &mut TxContext) {
     let registry = Registry {
         id: object::new(ctx),
         publisher,
-        attestations: table::new<address, Bag>(ctx),
+        attestations: table::new(ctx),
     };
 
     transfer::share_object(registry);
@@ -83,9 +83,9 @@ public fun register_type<T: key + store>(
     transfer::freeze_object(attestation_type);
 
     // Create and freeze Display for the type
-    let mut typeDisplay = display::new_with_fields<Attestation<T>>(&registry.publisher, fields, values, ctx);
-    typeDisplay.update_version();
-    transfer::public_freeze_object(typeDisplay);
+    let mut type_display = display::new_with_fields<Attestation<T>>(&registry.publisher, fields, values, ctx);
+    type_display.update_version();
+    transfer::public_freeze_object(type_display);
 }
 
 /// Create attestation
@@ -96,7 +96,7 @@ public fun attest<T: key + store>(
     registry: &mut Registry,
     ctx: &mut TxContext,
 ): RevokeCap {
-    // Abort if the type was not previosly created via `register_type`
+    // Abort if the type was not previously created via `register_type`
     let type_name = get_type_name<T>().into_string();
     assert!(attestation_type.type_name == type_name, EInvalidAttestationType);
 
