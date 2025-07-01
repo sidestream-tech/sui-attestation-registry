@@ -181,7 +181,17 @@ public fun get_attestation<T: key + store>(
     package_bag.borrow(created_by)
 }
 
-/// Return attestation is_pinned field for the given attestation
+/// Return attestation.revoked_by field
+public fun get_attestation_revoked_by<T: key + store>(
+    receiver: address,
+    created_by: address,
+    registry: &Registry
+): Option<address> {
+    let attestation: &Attestation<T> = get_attestation(receiver, created_by, registry);
+    attestation.revoked_by
+}
+
+/// Return attestation.is_pinned field
 public fun get_attestation_is_pinned<T: key + store>(
     receiver: address,
     created_by: address,

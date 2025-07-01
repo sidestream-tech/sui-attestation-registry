@@ -91,11 +91,16 @@ fun test_happy_path() {
         let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
 
+        // Sanity check
+        assert!(attestation::get_attestation_revoked_by<TestAttestation>(attestation_receiver, attestation_creator, &package_registry) == option::none());
+
+        // Revoke
         attestation::revoke<TestAttestation>(
             revoke_cap,
             &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
+        assert!(attestation::get_attestation_revoked_by<TestAttestation>(attestation_receiver, attestation_creator, &package_registry) == option::some(attestation_creator));
 
         // Return borrowed
         test_scenario::return_shared(package_registry);
