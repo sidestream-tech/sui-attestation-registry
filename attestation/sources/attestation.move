@@ -1,7 +1,5 @@
 module attestation::attestation;
 
-use std::ascii::{String};
-use std::type_name::{get as get_type_name};
 use sui::display::{Self};
 use sui::package::{Self, Publisher};
 use sui::table::{Self, Table};
@@ -9,10 +7,8 @@ use sui::bag::{Self, Bag};
 
 /// Not a valid owner of the publisher object
 const EInvalidTypePublisher: u64 = 1;
-/// AttestationType does not match provided T
-const EInvalidAttestationType: u64 = 2;
 /// Provided publisher does not match attested receiver
-const EInvalidReceiverPublisher: u64 = 3;
+const EInvalidReceiverPublisher: u64 = 2;
 
 /// Shared registry object
 public struct Registry has key {
@@ -22,10 +18,9 @@ public struct Registry has key {
 }
 
 /// Attestation type
-public struct AttestationType has key {
+public struct AttestationType<phantom T: key> has key {
     id: UID,
-    type_name: String,
-    type_publisher: Publisher,
+    publisher: Publisher,
 }
 
 /// Meta object holding attestation data
@@ -75,10 +70,9 @@ public fun register_type<T: key + store>(
     assert!(type_publisher.from_module<T>(), EInvalidTypePublisher);
 
     // Create and freeze newly registered type
-    let attestation_type = AttestationType {
+    let attestation_type = AttestationType<T> {
         id: object::new(ctx),
-        type_name: get_type_name<T>().into_string(),
-        type_publisher,
+        publisher: type_publisher,
     };
     transfer::freeze_object(attestation_type);
 
@@ -92,14 +86,10 @@ public fun register_type<T: key + store>(
 public fun attest<T: key + store>(
     data: T,
     receiver: address,
-    attestation_type: &AttestationType,
+    _: &AttestationType<T>,
     registry: &mut Registry,
     ctx: &mut TxContext,
 ): RevokeCap {
-    // Abort if the type was not previously created via `register_type`
-    let type_name = get_type_name<T>().into_string();
-    assert!(attestation_type.type_name == type_name, EInvalidAttestationType);
-
     // Create attestation
     let attestation = Attestation {
         id: object::new(ctx),

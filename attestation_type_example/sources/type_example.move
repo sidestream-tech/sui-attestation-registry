@@ -48,7 +48,7 @@ public fun register_itself(
 public fun attest(
     receiver: address,
     what: String,
-    attestation_type: &AttestationType,
+    attestation_type: &AttestationType<ExampleAttestation>,
     registry: &mut Registry,
     ctx: &mut TxContext,
 ): RevokeCap {

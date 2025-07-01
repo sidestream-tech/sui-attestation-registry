@@ -65,7 +65,7 @@ fun test_happy_path() {
     {
         // Borrow required objects
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
-        let attestation_type = test_scenario::take_immutable<AttestationType>(&scenario);
+        let attestation_type = test_scenario::take_immutable<AttestationType<TestAttestation>>(&scenario);
         
         let revoke_cap = attestation::attest<TestAttestation>(
             TestAttestation {
