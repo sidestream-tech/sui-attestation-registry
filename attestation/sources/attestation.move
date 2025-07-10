@@ -138,7 +138,7 @@ public fun revoke<T: key + store>(
     ctx: &mut TxContext,
 ) {
     // Get attestation from either attested or pinned bags
-    let attestation: Attestation<T>;
+    let mut attestation: Attestation<T>;
     let attested_bag = registry.attested.borrow_mut(revoke_cap.receiver);
     if (attested_bag.contains(revoke_cap.attestation_id)) {
         attestation = attested_bag.remove(revoke_cap.attestation_id);
@@ -147,13 +147,12 @@ public fun revoke<T: key + store>(
         attestation = pinned_bag.remove(revoke_cap.attestation_id);
     };
 
+    // Modify attestation
+    attestation.revoked_by = option::some(ctx.sender());
+
     // Move attestation to revoked bag
     let revoked_bag = registry.revoked.borrow_mut(revoke_cap.receiver);
     revoked_bag.add(object::id(&attestation), attestation);
-
-    // Modify attestation
-    let attestationMut: &mut Attestation<T> = revoked_bag.borrow_mut(revoke_cap.attestation_id);
-    attestationMut.revoked_by = option::some(ctx.sender());
 
     // Delete revocation capability, since it can't be used again
     let RevokeCap {
@@ -175,15 +174,14 @@ public fun pin<T: key + store>(
 
     // Get attestation from attested bag (ignore revoked)
     let attested_bag = registry.attested.borrow_mut(attestation_receiver);
-    let attestation: Attestation<T> = attested_bag.remove(attestation_id);
+    let mut attestation: Attestation<T> = attested_bag.remove(attestation_id);
+
+    // Modify before moving
+    attestation.was_pinned = true;
 
     // Move attestation to pinned bag
     let pinned_bag = registry.pinned.borrow_mut(attestation_receiver);
     pinned_bag.add(object::id(&attestation), attestation);
-
-    // Modify attestation object
-    let attestationMut: &mut Attestation<T> = pinned_bag.borrow_mut(attestation_id);
-    attestationMut.was_pinned = true;
 }
 
 /// Unpin attestation (using Publisher of the attestation.receiver)
