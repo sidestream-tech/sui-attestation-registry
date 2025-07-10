@@ -54,7 +54,7 @@ fun test_happy_path() {
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
         let attestation_type = test_scenario::take_immutable<AttestationType<ExampleAttestation>>(&scenario);
 
-        // Try to create attestation
+        // Create attestation
         let revoke_cap = type_example::attest(
             attestation_receiver,
             ascii::string(b"test"),
@@ -79,7 +79,7 @@ fun test_happy_path() {
 
         // Sanity check
         let attestation_id = attestation::get_revoke_cap_attestation_id(&revoke_cap);
-        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_id, &package_registry) == false);
+        assert!(attestation::get_attestation_was_pinned<ExampleAttestation>(attestation_receiver, attestation_id, &package_registry) == false);
 
         // Pin
         attestation::pin<ExampleAttestation>(
@@ -88,7 +88,7 @@ fun test_happy_path() {
             attestation_id,
             &mut package_registry,
         );
-        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_id, &package_registry) == true);
+        assert!(attestation::get_attestation_was_pinned<ExampleAttestation>(attestation_receiver, attestation_id, &package_registry) == true);
 
         // Unpin
         attestation::unpin<ExampleAttestation>(
@@ -97,7 +97,7 @@ fun test_happy_path() {
             attestation_id,
             &mut package_registry,
         );
-        assert!(attestation::get_attestation_is_pinned<ExampleAttestation>(attestation_receiver, attestation_id, &package_registry) == false);
+        assert!(attestation::get_attestation_was_pinned<ExampleAttestation>(attestation_receiver, attestation_id, &package_registry) == true);
 
         test_scenario::return_shared(package_registry);
         test_scenario::return_to_address(receiver_creator, receiver_publisher);
