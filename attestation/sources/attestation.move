@@ -132,7 +132,6 @@ public fun attest<T: key + store>(
 }
 
 /// Revoke attestation (using RevokeCap)
-#[allow(lint(freezing_capability))]
 public fun revoke<T: key + store>(
     revoke_cap: RevokeCap,
     registry: &mut Registry,
@@ -156,8 +155,13 @@ public fun revoke<T: key + store>(
     let attestationMut: &mut Attestation<T> = revoked_bag.borrow_mut(revoke_cap.attestation_id);
     attestationMut.revoked_by = option::some(ctx.sender());
 
-    // Freeze revocation capability, since it can't be used again
-    transfer::public_freeze_object(revoke_cap);
+    // Delete revocation capability, since it can't be used again
+    let RevokeCap {
+        id,
+        receiver: _,
+        attestation_id: _,
+    } = revoke_cap;
+    object::delete(id);
 }
 
 /// Pin attestation (using Publisher of the attestation.receiver)
