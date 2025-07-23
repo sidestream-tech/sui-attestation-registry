@@ -3,7 +3,7 @@ module attestation::attestation;
 use sui::display::{Self};
 use sui::package::{Self, Publisher};
 use sui::table::{Self, Table};
-use sui::bag::{Self, Bag};
+use sui::object_bag::{Self, ObjectBag};
 
 /// Not a valid owner of the publisher object
 const EInvalidTypePublisher: u64 = 1;
@@ -14,9 +14,9 @@ const EInvalidReceiverPublisher: u64 = 2;
 public struct Registry has key {
     id: UID,
     publisher: Publisher,
-    attested: Table<address /* receiver */, Bag /* attestation_id, Attestation<T> */>,
-    pinned: Table<address /* receiver */, Bag /* attestation_id, Attestation<T> */>,
-    revoked: Table<address /* receiver */, Bag /* attestation_id, Attestation<T> */>,
+    attested: Table<address /* receiver */, ObjectBag /* attestation_id, Attestation<T> */>,
+    pinned: Table<address /* receiver */, ObjectBag /* attestation_id, Attestation<T> */>,
+    revoked: Table<address /* receiver */, ObjectBag /* attestation_id, Attestation<T> */>,
 }
 
 /// Attestation type
@@ -121,13 +121,13 @@ public fun attest<T: key + store>(
     // Store attestation in the registry
     if (!registry.attested.contains(receiver)) {
         // if it's the first attestation for this package, create a new bag
-        let mut attested_bag = bag::new(ctx);
+        let mut attested_bag = object_bag::new(ctx);
         attested_bag.add(attestation_id, attestation);
         registry.attested.add(receiver, attested_bag);
 
         // also directly create empty bags for pinned and revoked attestations
-        registry.pinned.add(receiver, bag::new(ctx));
-        registry.revoked.add(receiver, bag::new(ctx));
+        registry.pinned.add(receiver, object_bag::new(ctx));
+        registry.revoked.add(receiver, object_bag::new(ctx));
     } else {
         // else, borrow existing bag
         let attested_bag = registry.attested.borrow_mut(receiver);
