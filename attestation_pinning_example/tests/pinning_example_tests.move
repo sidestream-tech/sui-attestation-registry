@@ -79,15 +79,16 @@ fun test_happy_path() {
 
         // Sanity check
         let attestation_id = attestation::revoke_cap_attestation_id(&revoke_cap);
-        assert!(package_registry.attestation_was_pinned<ExampleAttestation>(attestation_receiver, attestation_id) == false);
+        assert!(package_registry.attestation_pinned_by<ExampleAttestation>(attestation_receiver, attestation_id) == option::none());
 
         // Pin
         package_registry.pin<ExampleAttestation>(
             &mut receiver_publisher,
             attestation_receiver,
             attestation_id,
+            test_scenario::ctx(&mut scenario),
         );
-        assert!(package_registry.attestation_was_pinned<ExampleAttestation>(attestation_receiver, attestation_id) == true);
+        assert!(package_registry.attestation_pinned_by<ExampleAttestation>(attestation_receiver, attestation_id) == option::some(receiver_creator));
 
         // Unpin
         package_registry.unpin<ExampleAttestation>(
@@ -95,7 +96,7 @@ fun test_happy_path() {
             attestation_receiver,
             attestation_id,
         );
-        assert!(package_registry.attestation_was_pinned<ExampleAttestation>(attestation_receiver, attestation_id) == true);
+        assert!(package_registry.attestation_pinned_by<ExampleAttestation>(attestation_receiver, attestation_id) == option::some(receiver_creator));
 
         test_scenario::return_shared(package_registry);
         test_scenario::return_to_address(receiver_creator, receiver_publisher);

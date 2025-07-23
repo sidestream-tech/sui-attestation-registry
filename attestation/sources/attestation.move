@@ -32,7 +32,7 @@ public struct Attestation<T: store> has key, store {
     data: T,
     created_by: address,
     revoked_by: Option<address>,
-    was_pinned: bool,
+    pinned_by: Option<address>,
     revoke_cap_id: ID,
 }
 
@@ -107,7 +107,7 @@ public fun attest<T: key + store>(
         data,
         created_by: ctx.sender(),
         revoked_by: option::none(),
-        was_pinned: false,
+        pinned_by: option::none(),
         revoke_cap_id,
     };
 
@@ -176,6 +176,7 @@ public fun pin<T: key + store>(
     receiver_publisher: &mut Publisher,
     attestation_receiver: address,
     attestation_id: ID,
+    ctx: &mut TxContext,
 ) {
     assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
 
@@ -184,7 +185,7 @@ public fun pin<T: key + store>(
     let mut attestation: Attestation<T> = attested_bag.remove(attestation_id);
 
     // Modify before moving
-    attestation.was_pinned = true;
+    attestation.pinned_by = option::some(ctx.sender());
 
     // Move attestation to pinned bag
     let pinned_bag = registry.pinned.borrow_mut(attestation_receiver);
@@ -238,14 +239,14 @@ public fun attestation_revoked_by<T: key + store>(
     attestation.revoked_by
 }
 
-/// Return attestation.was_pinned field
-public fun attestation_was_pinned<T: key + store>(
+/// Return attestation.pinned_by field
+public fun attestation_pinned_by<T: key + store>(
     registry: &Registry,
     receiver: address,
     attestation_id: ID,
-): bool {
+): Option<address> {
     let attestation = registry.attestation<T>(receiver, attestation_id);
-    attestation.was_pinned
+    attestation.pinned_by
 }
 
 /// Return revoke_cap.attestation_id field
