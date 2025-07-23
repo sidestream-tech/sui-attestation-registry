@@ -203,7 +203,7 @@ public fun unpin<T: key + store>(
 }
 
 /// Return attestation for the given receiver
-public fun get_attestation<T: key + store>(
+public fun attestation<T: key + store>(
     registry: &Registry,
     receiver: address,
     attestation_id: ID,
@@ -222,27 +222,27 @@ public fun get_attestation<T: key + store>(
 }
 
 /// Return attestation.revoked_by field
-public fun get_attestation_revoked_by<T: key + store>(
+public fun attestation_revoked_by<T: key + store>(
     registry: &Registry,
     receiver: address,
     attestation_id: ID,
 ): Option<address> {
-    let attestation = registry.get_attestation<T>(receiver, attestation_id);
+    let attestation = registry.attestation<T>(receiver, attestation_id);
     attestation.revoked_by
 }
 
 /// Return attestation.was_pinned field
-public fun get_attestation_was_pinned<T: key + store>(
+public fun attestation_was_pinned<T: key + store>(
     registry: &Registry,
     receiver: address,
     attestation_id: ID,
 ): bool {
-    let attestation = registry.get_attestation<T>(receiver, attestation_id);
+    let attestation = registry.attestation<T>(receiver, attestation_id);
     attestation.was_pinned
 }
 
 /// Return revoke_cap.attestation_id field
-public fun get_revoke_cap_attestation_id(
+public fun revoke_cap_attestation_id(
     revoke_cap: &RevokeCap,
 ): ID {
     revoke_cap.attestation_id
