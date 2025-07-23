@@ -33,6 +33,7 @@ public struct Attestation<T: store> has key, store {
     created_by: address,
     revoked_by: Option<address>,
     was_pinned: bool,
+    revoke_cap_id: ID,
 }
 
 /// Object returned when attestation is created
@@ -93,20 +94,26 @@ public fun attest<T: key + store>(
     receiver: address,
     ctx: &mut TxContext,
 ): RevokeCap {
+    // Create ids
+    let attestation_uid = object::new(ctx);
+    let revoke_cap_uid = object::new(ctx);
+    let attestation_id = attestation_uid.uid_to_inner();
+    let revoke_cap_id = revoke_cap_uid.uid_to_inner();
+
     // Create attestation
     let attestation = Attestation {
-        id: object::new(ctx),
+        id: attestation_uid,
         receiver,
         data,
         created_by: ctx.sender(),
         revoked_by: option::none(),
         was_pinned: false,
+        revoke_cap_id,
     };
-    let attestation_id = object::id(&attestation);
 
     // Create revocation capability
     let revoke_cap = RevokeCap {
-        id: object::new(ctx),
+        id: revoke_cap_uid,
         receiver,
         attestation_id,
     };
@@ -160,7 +167,7 @@ public fun revoke<T: key + store>(
         receiver: _,
         attestation_id: _,
     } = revoke_cap;
-    object::delete(id);
+    id.delete();
 }
 
 /// Pin attestation (using Publisher of the attestation.receiver)
