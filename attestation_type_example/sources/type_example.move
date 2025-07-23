@@ -2,7 +2,7 @@ module attestation_type_example::type_example;
 
 use sui::package::{Self, Publisher};
 use std::ascii::{String};
-use attestation::attestation::{Self, Registry, AttestationType, RevokeCap};
+use attestation::attestation::{Registry, AttestationType, RevokeCap};
 
 /// Attestation type
 public struct ExampleAttestation has key, store {
@@ -35,32 +35,30 @@ public fun register_itself(
         b"Test usage of the Attesation package".to_string(),
         b"https://example.com/attestation/{id}".to_string(),
     ];
-    attestation::register_type<ExampleAttestation>(
+    registry.register_type<ExampleAttestation>(
         publisher,
         fields,
         values,
-        registry,
         ctx,
     )
 }
 
 /// Create attestation
 public fun attest(
+    registry: &mut Registry,
+    attestation_type: &AttestationType<ExampleAttestation>,
     receiver: address,
     what: String,
-    attestation_type: &AttestationType<ExampleAttestation>,
-    registry: &mut Registry,
     ctx: &mut TxContext,
 ): RevokeCap {
     let attestation_data = ExampleAttestation {
         id: object::new(ctx),
         what,
     };
-    attestation::attest<ExampleAttestation>(
+    registry.attest<ExampleAttestation>(
+        attestation_type,
         attestation_data,
         receiver,
-        attestation_type,
-        registry,
         ctx,
     )
 }

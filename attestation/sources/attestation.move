@@ -63,10 +63,10 @@ fun init(otw: ATTESTATION, ctx: &mut TxContext) {
 /// Register attestation type and its Display
 #[allow(lint(freeze_wrapped))]
 public fun register_type<T: key + store>(
+    registry: &mut Registry,
     type_publisher: Publisher,
     fields: vector<std::string::String>,
     values: vector<std::string::String>,
-    registry: &mut Registry,
     ctx: &mut TxContext,
 ) {
     // Ensure `T` type belongs to the provided `publisher`
@@ -87,10 +87,10 @@ public fun register_type<T: key + store>(
 
 /// Create attestation
 public fun attest<T: key + store>(
+    registry: &mut Registry,
+    _: &AttestationType<T>,
     data: T,
     receiver: address,
-    _: &AttestationType<T>,
-    registry: &mut Registry,
     ctx: &mut TxContext,
 ): RevokeCap {
     // Create attestation
@@ -133,8 +133,8 @@ public fun attest<T: key + store>(
 
 /// Revoke attestation (using RevokeCap)
 public fun revoke<T: key + store>(
-    revoke_cap: RevokeCap,
     registry: &mut Registry,
+    revoke_cap: RevokeCap,
     ctx: &mut TxContext,
 ) {
     // Get attestation from either attested or pinned bags
@@ -165,10 +165,10 @@ public fun revoke<T: key + store>(
 
 /// Pin attestation (using Publisher of the attestation.receiver)
 public fun pin<T: key + store>(
+    registry: &mut Registry,
     receiver_publisher: &mut Publisher,
     attestation_receiver: address,
     attestation_id: ID,
-    registry: &mut Registry
 ) {
     assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
 
@@ -186,10 +186,10 @@ public fun pin<T: key + store>(
 
 /// Unpin attestation (using Publisher of the attestation.receiver)
 public fun unpin<T: key + store>(
+    registry: &mut Registry,
     receiver_publisher: &mut Publisher,
     attestation_receiver: address,
     attestation_id: ID,
-    registry: &mut Registry
 ) {
     assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
 
@@ -204,9 +204,9 @@ public fun unpin<T: key + store>(
 
 /// Return attestation for the given receiver
 public fun get_attestation<T: key + store>(
+    registry: &Registry,
     receiver: address,
     attestation_id: ID,
-    registry: &Registry
 ): &Attestation<T> {
     if (
         registry.attested.borrow(receiver).contains(attestation_id)
@@ -223,21 +223,21 @@ public fun get_attestation<T: key + store>(
 
 /// Return attestation.revoked_by field
 public fun get_attestation_revoked_by<T: key + store>(
+    registry: &Registry,
     receiver: address,
     attestation_id: ID,
-    registry: &Registry
 ): Option<address> {
-    let attestation: &Attestation<T> = get_attestation(receiver, attestation_id, registry);
+    let attestation = registry.get_attestation<T>(receiver, attestation_id);
     attestation.revoked_by
 }
 
 /// Return attestation.was_pinned field
 public fun get_attestation_was_pinned<T: key + store>(
+    registry: &Registry,
     receiver: address,
     attestation_id: ID,
-    registry: &Registry
 ): bool {
-    let attestation: &Attestation<T> = get_attestation(receiver, attestation_id, registry);
+    let attestation = registry.get_attestation<T>(receiver, attestation_id);
     attestation.was_pinned
 }
 

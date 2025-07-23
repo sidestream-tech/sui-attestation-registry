@@ -48,10 +48,10 @@ fun test_happy_path() {
 
         // Try to create attestation
         let revoke_cap = type_example::attest(
+            &mut package_registry,
+            &attestation_type,
             attestation_receiver,
             ascii::string(b"test"),
-            &attestation_type,
-            &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
         transfer::public_transfer(revoke_cap, attestation_creator);
@@ -69,9 +69,8 @@ fun test_happy_path() {
         let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
 
         // Try to revoke attestation
-        attestation::revoke<ExampleAttestation>(
+        package_registry.revoke<ExampleAttestation>(
             revoke_cap,
-            &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
 

@@ -48,11 +48,10 @@ fun test_happy_path() {
         let type_publisher = test_scenario::take_from_address<Publisher>(&scenario, type_creator);
 
         // Try to create type
-        attestation::register_type<TestAttestation>(
+        package_registry.register_type<TestAttestation>(
             type_publisher,
             vector[],
             vector[],
-            &mut package_registry,
             test_scenario::ctx(&mut scenario)
         );
 
@@ -67,14 +66,13 @@ fun test_happy_path() {
         let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
         let attestation_type = test_scenario::take_immutable<AttestationType<TestAttestation>>(&scenario);
         
-        let revoke_cap = attestation::attest<TestAttestation>(
+        let revoke_cap = package_registry.attest<TestAttestation>(
+            &attestation_type,
             TestAttestation {
                 id: object::new(test_scenario::ctx(&mut scenario)),
                 is_good: true
             },
             attestation_receiver,
-            &attestation_type,
-            &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
 
@@ -93,15 +91,14 @@ fun test_happy_path() {
 
         // Sanity check
         let attestation_id = attestation::get_revoke_cap_attestation_id(&revoke_cap);
-        assert!(attestation::get_attestation_revoked_by<TestAttestation>(attestation_receiver, attestation_id, &package_registry) == option::none());
+        assert!(package_registry.get_attestation_revoked_by<TestAttestation>(attestation_receiver, attestation_id) == option::none());
 
         // Revoke
-        attestation::revoke<TestAttestation>(
+        package_registry.revoke<TestAttestation>(
             revoke_cap,
-            &mut package_registry,
             test_scenario::ctx(&mut scenario),
         );
-        assert!(attestation::get_attestation_revoked_by<TestAttestation>(attestation_receiver, attestation_id, &package_registry) == option::some(attestation_creator));
+        assert!(package_registry.get_attestation_revoked_by<TestAttestation>(attestation_receiver, attestation_id) == option::some(attestation_creator));
 
         // Return borrowed
         test_scenario::return_shared(package_registry);
