@@ -130,8 +130,7 @@ public fun attest<T: key + store>(
         registry.revoked.add(receiver, object_bag::new(ctx));
     } else {
         // else, borrow existing bag
-        let attested_bag = registry.attested.borrow_mut(receiver);
-        attested_bag.add(attestation_id, attestation);
+        registry.attested[receiver].add(attestation_id, attestation);
     };
 
     // Return revocation capability
@@ -150,16 +149,14 @@ public fun revoke<T: key + store>(
     if (attested_bag.contains(revoke_cap.attestation_id)) {
         attestation = attested_bag.remove(revoke_cap.attestation_id);
     } else {
-        let pinned_bag = registry.pinned.borrow_mut(revoke_cap.receiver);
-        attestation = pinned_bag.remove(revoke_cap.attestation_id);
+        attestation = registry.pinned[revoke_cap.receiver].remove(revoke_cap.attestation_id);
     };
 
     // Modify attestation
     attestation.revoked_by = option::some(ctx.sender());
 
     // Move attestation to revoked bag
-    let revoked_bag = registry.revoked.borrow_mut(revoke_cap.receiver);
-    revoked_bag.add(object::id(&attestation), attestation);
+    registry.revoked[revoke_cap.receiver].add(object::id(&attestation), attestation);
 
     // Delete revocation capability, since it can't be used again
     let RevokeCap {
@@ -181,15 +178,13 @@ public fun pin<T: key + store>(
     assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
 
     // Get attestation from attested bag (ignore revoked)
-    let attested_bag = registry.attested.borrow_mut(attestation_receiver);
-    let mut attestation: Attestation<T> = attested_bag.remove(attestation_id);
+    let mut attestation: Attestation<T> = registry.attested[attestation_receiver].remove(attestation_id);
 
     // Modify before moving
     attestation.pinned_by = option::some(ctx.sender());
 
     // Move attestation to pinned bag
-    let pinned_bag = registry.pinned.borrow_mut(attestation_receiver);
-    pinned_bag.add(object::id(&attestation), attestation);
+    registry.pinned[attestation_receiver].add(object::id(&attestation), attestation);
 }
 
 /// Unpin attestation (using Publisher of the attestation.receiver)
@@ -202,12 +197,10 @@ public fun unpin<T: key + store>(
     assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
 
     // Get attestation from pinned bag (ignore revoked)
-    let pinned_bag = registry.pinned.borrow_mut(attestation_receiver);
-    let attestation: Attestation<T> = pinned_bag.remove(attestation_id);
+    let attestation: Attestation<T> = registry.pinned[attestation_receiver].remove(attestation_id);
 
     // Move attestation to attested bag
-    let attested_bag = registry.attested.borrow_mut(attestation_receiver);
-    attested_bag.add(attestation_id, attestation);
+    registry.attested[attestation_receiver].add(attestation_id, attestation);
 }
 
 /// Return attestation for the given receiver
