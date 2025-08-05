@@ -1,0 +1,107 @@
+#[test_only]
+module attestation_pinning_example::pinning_example_tests;
+
+/// Imports
+use std::ascii;
+use sui::test_scenario;
+use sui::package::{Publisher};
+use attestation::attestation::{Self, Registry, AttestationType, RevokeCap};
+use attestation_type_example::type_example::{Self, ExampleAttestation};
+use attestation_pinning_example::pinning_example::{Self};
+
+#[test]
+fun test_happy_path() {
+    let registry_creator = @0xA11CE;
+    let type_creator = @0xB0B;
+    let attestation_creator = @0xCAFE;
+    let receiver_creator = @0xFACE;
+    let attestation_receiver = @attestation_pinning_example;
+
+    let mut scenario = test_scenario::begin(registry_creator);
+    // Publish attestation package
+    {
+        attestation::test_init(test_scenario::ctx(&mut scenario));
+    };
+
+    scenario.next_tx(type_creator);
+    // Publish type package
+    {
+        type_example::test_init(test_scenario::ctx(&mut scenario));
+    };
+
+    scenario.next_tx(type_creator);
+    // Register itself
+    {
+        // Borrow required objects
+        let type_publisher = test_scenario::take_from_address<Publisher>(&scenario, type_creator);
+        let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
+
+        type_example::register_itself(type_publisher, &mut package_registry, test_scenario::ctx(&mut scenario));
+
+        test_scenario::return_shared(package_registry);
+    };
+
+    scenario.next_tx(receiver_creator);
+    // Publish package to be attested
+    {
+        pinning_example::test_init(test_scenario::ctx(&mut scenario));
+    };
+
+    scenario.next_tx(attestation_creator);
+    // Attest
+    {
+        // Borrow required objects
+        let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
+        let attestation_type = test_scenario::take_immutable<AttestationType<ExampleAttestation>>(&scenario);
+
+        // Create attestation
+        let revoke_cap = type_example::attest(
+            &mut package_registry,
+            &attestation_type,
+            attestation_receiver,
+            ascii::string(b"test"),
+            test_scenario::ctx(&mut scenario),
+        );
+        transfer::public_transfer(revoke_cap, attestation_creator);
+
+        // Return borrowed
+        test_scenario::return_shared(package_registry);
+        test_scenario::return_immutable(attestation_type);
+    };
+
+    scenario.next_tx(receiver_creator);
+    // Pin/unpin attestation
+    {
+        // Borrow required objects
+        let mut package_registry = test_scenario::take_shared<Registry>(&scenario);
+        let mut receiver_publisher = test_scenario::take_from_address<Publisher>(&scenario, receiver_creator);
+        let revoke_cap = test_scenario::take_from_address<RevokeCap>(&scenario, attestation_creator);
+
+        // Sanity check
+        let attestation_id = attestation::revoke_cap_attestation_id(&revoke_cap);
+        assert!(package_registry.attestation_pinned_by<ExampleAttestation>(attestation_receiver, attestation_id) == option::none());
+
+        // Pin
+        package_registry.pin<ExampleAttestation>(
+            &mut receiver_publisher,
+            attestation_receiver,
+            attestation_id,
+            test_scenario::ctx(&mut scenario),
+        );
+        assert!(package_registry.attestation_pinned_by<ExampleAttestation>(attestation_receiver, attestation_id) == option::some(receiver_creator));
+
+        // Unpin
+        package_registry.unpin<ExampleAttestation>(
+            &mut receiver_publisher,
+            attestation_receiver,
+            attestation_id,
+        );
+        assert!(package_registry.attestation_pinned_by<ExampleAttestation>(attestation_receiver, attestation_id) == option::some(receiver_creator));
+
+        test_scenario::return_shared(package_registry);
+        test_scenario::return_to_address(receiver_creator, receiver_publisher);
+        test_scenario::return_to_address(attestation_creator, revoke_cap);
+    };
+
+    scenario.end();
+}
