@@ -226,17 +226,19 @@ public fun attestation<T: key + store>(
     receiver: address,
     attestation_id: ID,
 ): &Attestation<T> {
-    if (
-        registry.attested.borrow(receiver).contains(attestation_id)
-    ) {
-        registry.attested.borrow(receiver).borrow(attestation_id)
-    } else if (
-        registry.revoked.borrow(receiver).contains(attestation_id)
-    ) {
-        registry.revoked.borrow(receiver).borrow(attestation_id)
-    } else {
-        registry.pinned.borrow(receiver).borrow(attestation_id)
-    }
+    // Ensure receiver is known
+    assert!(registry.attested.contains(receiver), EUnknownReceiver);
+
+    // Find attestation in one of the bags
+    let attested = &registry.attested[receiver];
+    if (attested.contains(attestation_id)) return &attested[attestation_id];
+    let revoked = &registry.revoked[receiver];
+    if (revoked.contains(attestation_id)) return &revoked[attestation_id];
+    let pinned = &registry.pinned[receiver];
+    if (pinned.contains(attestation_id)) return &pinned[attestation_id];
+
+    // Abort if attestation is not found in any of the bags
+    abort EUnknownAttestationId
 }
 
 /// Return attestation.revoked_by field
