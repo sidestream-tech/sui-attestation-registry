@@ -1,6 +1,6 @@
 module attestation::attestation;
 
-use sui::display::{Self};
+use sui::display;
 use sui::package::{Self, Publisher};
 use sui::table::{Self, Table};
 use sui::object_bag::{Self, ObjectBag};
@@ -9,6 +9,10 @@ use sui::object_bag::{Self, ObjectBag};
 const EInvalidTypePublisher: u64 = 1;
 /// Provided publisher does not match attested receiver
 const EInvalidReceiverPublisher: u64 = 2;
+/// Provided receiver was never attested
+const EUnknownReceiver: u64 = 3;
+/// Provided attestation_id never existed
+const EUnknownAttestationId: u64 = 3;
 
 /// Shared registry object
 public struct Registry has key {
@@ -174,9 +178,16 @@ public fun pin<T: key + store>(
     attestation_id: ID,
     ctx: &mut TxContext,
 ) {
+    // Ensure publisher match attestation receiver
     assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
 
-    // Get attestation from attested bag (ignore revoked)
+    // Ensure receiver is known
+    assert!(registry.attested.contains(attestation_receiver), EUnknownReceiver);
+
+    // Ensure attestation is known and not revoked
+    assert!(registry.attested[attestation_receiver].contains(attestation_id), EUnknownAttestationId);
+
+    // Get attestation from attested bag
     let mut attestation: Attestation<T> = registry.attested[attestation_receiver].remove(attestation_id);
 
     // Modify before moving
@@ -193,7 +204,14 @@ public fun unpin<T: key + store>(
     attestation_receiver: address,
     attestation_id: ID,
 ) {
+    // Ensure publisher match attestation receiver
     assert!(receiver_publisher.published_package() == attestation_receiver.to_ascii_string(), EInvalidReceiverPublisher);
+
+    // Ensure receiver is known
+    assert!(registry.pinned.contains(attestation_receiver), EUnknownReceiver);
+
+    // Ensure attestation is known and previously pinned
+    assert!(registry.pinned[attestation_receiver].contains(attestation_id), EUnknownAttestationId);
 
     // Get attestation from pinned bag (ignore revoked)
     let attestation: Attestation<T> = registry.pinned[attestation_receiver].remove(attestation_id);
