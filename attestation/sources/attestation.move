@@ -152,12 +152,11 @@ public fun revoke<T: key + store>(
     id.delete();
 
     // Get attestation from either attested or pinned bags
-    let mut attestation: Attestation<T>;
     let attested_bag = registry.attested.borrow_mut(receiver);
-    if (attested_bag.contains(attestation_id)) {
-        attestation = attested_bag.remove(attestation_id);
+    let mut attestation: Attestation<T> = if (attested_bag.contains(attestation_id)) {
+        attested_bag.remove(attestation_id)
     } else {
-        attestation = registry.pinned[receiver].remove(attestation_id);
+        registry.pinned[receiver].remove(attestation_id)
     };
 
     // Modify attestation
